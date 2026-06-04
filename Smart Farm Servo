@@ -1,0 +1,69 @@
+#define BLYNK_TEMPLATE_ID   "TMPLxxxxxxx"
+#define BLYNK_TEMPLATE_NAME "PeternakanPintar"
+#define BLYNK_AUTH_TOKEN    "YourAuthToken"
+
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+#include <ESP8266Servo.h>
+
+const char* ssid = "NamaWiFi";
+const char* pass = "PasswordWiFi";
+
+#define DHTPIN    D4
+#define TRIG_PIN  D1
+#define ECHO_PIN  D2
+#define LED_PIN   D5
+#define SERVO_PIN D3
+
+DHT dht(DHTPIN, DHT11);
+Servo feeder;
+BlynkTimer timer;
+
+void update() {
+  // Baca DHT11
+  float suhu = dht.readTemperature();
+  float hum  = dht.readHumidity();
+
+  // Baca HC-SR04
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  float jarak = pulseIn(ECHO_PIN, HIGH) * 0.017;
+
+  // Kirim ke Blynk
+  Blynk.virtualWrite(V0, suhu);
+  Blynk.virtualWrite(V1, hum);
+  Blynk.virtualWrite(V2, jarak);
+
+  // LED nyala jika suhu > 33°C
+  digitalWrite(LED_PIN, suhu > 33.0 ? HIGH : LOW);
+  Blynk.virtualWrite(V3, suhu > 33.0 ? 1 : 0);
+}
+
+// Tombol feeder dari app → V4
+BLYNK_WRITE(V4) {
+  if (param.asInt()) {
+    feeder.write(90);
+    delay(800);
+    feeder.write(0);
+  }
+}
+
+void setup() {
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+  dht.begin();
+  feeder.attach(SERVO_PIN);
+  feeder.write(0);
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  timer.setInterval(2000L, update);
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+}
